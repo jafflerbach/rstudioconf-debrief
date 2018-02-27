@@ -1,0 +1,120 @@
+---
+title: "Tibbletime"
+author: "Jamie Afflerbach"
+date: "2/27/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Install from either CRAN or GH
+# install.packages("tibbletime")
+devtools::install_github("business-science/tibbletime")
+
+install.packages("lubridate")
+
+# Load libraries
+library(tidyverse)
+library(tibbletime)
+library(lubridate)
+```
+
+## Data
+
+```{r}
+
+data <- read_csv("data/sharks.csv")
+
+View(data)
+class(data)
+```
+
+First we need to turn this `tbl_df` into a `tbl_time`. You use the `as_tbl_time()` function for this.
+
+```{r}
+sharks_tbl <- as_tbl_time(sharks, index = Date)
+```
+
+`tibbletime` doesn't recognize the date column. If you look at `sharks` you see that under "Date" it says `chr` meaning R sees it as a character, not a date. Using the `lubridate` package we can change these dates into the correct format. Specifically, the `mdy()` function since our dates are currently in that format.
+
+```{r}
+
+sharks <- data %>%
+  mutate(Date = mdy(Date))
+
+sharks
+```
+
+Now it shows this column as a date.
+
+Let's try that again.
+
+```{r}
+sharks_tbl <- as_tbl_time(sharks, index = Date) %>%
+  arrange(Date) %>%
+  mutate(Depth = Depth * -1) #changing depth to be positive
+
+class(sharks_tbl)
+```
+
+Now we can parse this dataset for what we want.
+
+Let's look at mean depth and temperature in summer vs winter months.
+
+You can treat these tbl_time dataframes just like regular dataframes.
+
+```{r}
+range(sharks_tbl$Date)
+```
+
+Date specific
+```{r}
+sharks_tbl %>%
+  filter_time("2012-06-21" ~ "2012-09-21")
+```
+
+More broad (looking for months not specific dates)
+```{r}
+sharks_tbl %>%
+  filter_time("2012-06" ~ "2012-09")
+```
+
+Start of the time series to specified date/month/year
+```{r}
+sharks_tbl %>%
+  filter_time("start" ~ "2012-12") #everything before January 2013.
+```
+
+## Analysis with time_tbl
+
+Mean depth and temp of shark dives in summer of 2012.
+
+```{r}
+
+sharks_tbl %>%
+  filter_time("2012-06" ~ "2012-09") %>%
+  group_by(ID) %>%
+  summarize(mean_depth = mean(Depth),
+            mean_temp  = mean(Temp))
+
+```
+
+Grouping with tibbletime
+
+```{r}
+collapse_by(sharks_tbl, period = "monthly") %>%
+  group_by(Date) %>%
+  summarise(mean_depth = mean(Depth),
+            mean_temp  = mean(Temp))
+```
+
+```{r}
+collapse_by(sharks_tbl, period = "monthly") %>%
+  group_by(Date) %>%
+  summarise(mean_depth = mean(Depth),
+            mean_temp  = mean(Temp)) %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = mean_temp)) +
+  ylab("Mean dive depth (m)")
+```
+
+
